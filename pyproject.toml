@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maskcheck"
+version = "0.1.0"
+description = "Find the fields where constrained decoding is silently mangling your values."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+llamacpp = ["requests>=2.31"]
+hf = ["transformers>=4.44", "torch>=2.4"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+maskcheck = "maskcheck.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
