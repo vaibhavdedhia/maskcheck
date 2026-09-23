@@ -1,0 +1,8 @@
+{"currency": "CHF", "invoice_id": "INV-7781", "line_items": [{"qty": 4, "sku": "NS-1"}], "total": 2450.0, "vendor": "Nestle Suisse"}
+{"currency": "JPY", "invoice_id": "JP-0031", "line_items": [{"qty": 20, "sku": "KT-7"}], "total": 158000.0, "vendor": "Kyoto Textiles"}
+{"currency": "CAD", "invoice_id": "CA-556", "line_items": [{"qty": 3, "sku": "ML-2"}], "total": 875.4, "vendor": "Maple Logistics"}
+{"currency": "AUD", "invoice_id": "AU-9", "line_items": [{"qty": 1, "sku": "OS-1"}], "total": 62.0, "vendor": "Outback Supply"}
+{"currency": "USD", "invoice_id": "INV-2291", "line_items": [{"qty": 2, "sku": "A1"}], "total": 1240.5, "vendor": "Acme Corp"}
+{"currency": "EUR", "invoice_id": "INV-0007", "line_items": [{"qty": 3, "sku": "GX-9"}], "total": 89.99, "vendor": "Globex"}
+{"currency": "GBP", "invoice_id": "SB-448", "line_items": [{"qty": 12, "sku": "SOY-1"}], "total": 15300.0, "vendor": "Soylent Ltd"}
+{"currency": "INR", "invoice_id": "HP-014", "line_items": [{"qty": 5, "sku": "NUC-3"}], "total": 425000.0, "vendor": "Hooli India"}

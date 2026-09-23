@@ -1,0 +1,8 @@
+{"currency": "USD", "invoice_id": "INV-2291", "line_items": [{"qty": 2, "sku": "A1"}, {"qty": 1, "sku": "B2"}], "total": 1240.5, "vendor": "Acme Corp"}
+{"currency": "EUR", "invoice_id": "INV-0007", "line_items": [{"qty": 3, "sku": "GX-9"}], "total": 89.99, "vendor": "Globex"}
+{"currency": "GBP", "invoice_id": "SB-44812", "line_items": [{"qty": 120, "sku": "SOY-1"}, {"qty": 40, "sku": "SOY-2"}], "total": 15300.0, "vendor": "Soylent Ltd"}
+{"currency": "USD", "invoice_id": "INV-31", "line_items": [{"qty": 1, "sku": "TPS"}], "total": 7.25, "vendor": "Initech"}
+{"currency": "INR", "invoice_id": "HP-2026-014", "line_items": [{"qty": 5, "sku": "NUC-3"}], "total": 425000.0, "vendor": "Hooli"}
+{"currency": "USD", "invoice_id": "INV-88231", "line_items": [{"qty": 1, "sku": "RC-1"}], "total": 0.99, "vendor": "Umbrella Health"}
+{"currency": "EUR", "invoice_id": "MSS-7", "line_items": [{"qty": 2, "sku": "MD-X"}, {"qty": 9, "sku": "MD-Y"}, {"qty": 1, "sku": "MD-Z"}], "total": 66666.67, "vendor": "Massive Dynamic"}
+{"currency": "GBP", "invoice_id": "INV-5150", "line_items": [{"qty": 1, "sku": "WE-BAT"}], "total": 980.0, "vendor": "Wayne Enterprises"}

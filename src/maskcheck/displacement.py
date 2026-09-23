@@ -24,10 +24,17 @@ suspicion to measured accuracy via `scoring.py`.
 import math
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from .pathtrack import VALUE_REGIONS, path_at_offsets
+from .pathtrack import VALUE_REGIONS, PathTracker, path_at_offsets
 
 # Below this, a field is producing tokens the free model was fine with.
 DEFAULT_SUSPECT_DISPLACEMENT = 0.5
+
+# A field is also suspect when the mask beat the model's own argmax this
+# often, regardless of mean displacement. Pooled means are DILUTED by clean
+# samples: if only half your documents conflict with the schema, a field
+# that is catastrophically wrong half the time shows a mean around 0.44 and
+# slips under a 0.5 threshold. Override rate does not dilute the same way.
+DEFAULT_SUSPECT_OVERRIDE_RATE = 0.25
 # A field must contribute at least this many value tokens to be judged.
 DEFAULT_MIN_STEPS = 2
 
@@ -94,18 +101,53 @@ class FieldReport(object):
         }
 
 
-def bucket(text, steps):
-    # type: (str, Sequence[Step], ) -> Dict[str, List[Step]]
-    """Group value-region steps by JSON path for one generation."""
+def bucket(text, steps, span=None):
+    # type: (str, Sequence[Step], Optional[Tuple[int, int]]) -> Dict[str, List[Step]]
+    """Group value-region steps by JSON path for one generation.
+
+    Attribution is confined to the span that `repair.locate` parsed, so the
+    displacement half and the accuracy half agree on which text is the
+    document. Without this, a model that narrates before answering --
+
+        Line items: [{"sku": "NS-1", "qty": 4}]  ```json
+        {"invoice_id": "INV-7781", ...}
+
+    -- gets its stray in-prose array attributed as `[0].sku`, naming a field
+    that does not exist in the record that was actually scored.
+    """
     if not steps:
         return {}
     starts = [s.offset for s in steps]
     for i in range(1, len(starts)):
         if starts[i] < starts[i - 1]:
             raise ValueError("steps must be ordered by offset")
-    probes = [min(o + 1, len(text)) for o in starts]
+
+    if span is None:
+        from .repair import locate
+        _parsed, stage, a, b = locate(text)
+        # Nothing parsed: fall back to the whole text rather than reporting
+        # nothing, since a failed generation is still worth inspecting.
+        span = (0, len(text)) if stage == "failed" else (a, b)
+    lo, hi = span
+
+    # Attribute at offset+1, i.e. having consumed the token's FIRST
+    # character: the region at offset i reflects only text[:i], so a numeric
+    # token would still read as `structural` -- the digit that opens the
+    # number region is the very character being asked about.
+    tracker = PathTracker()
     out = {}  # type: Dict[str, List[Step]]
-    for step, (path, region) in zip(steps, path_at_offsets(text, probes)):
+    cursor = lo
+    for step in steps:
+        if step.offset < lo:
+            continue
+        if step.offset >= hi:
+            break
+        probe = min(step.offset + 1, hi)
+        if probe > cursor:
+            tracker.feed(text[cursor:probe])
+            cursor = probe
+        region = tracker.region()
+        path = tracker.path()
         if region in VALUE_REGIONS and path:
             out.setdefault(path, []).append(step)
     return out
@@ -126,8 +168,9 @@ def summarise(buckets,
         known = [s for s in group if s.overridden is not None]
         r.known_overrides = sum(1 for s in known if s.overridden)
         r.override_rate = (r.known_overrides / len(known)) if known else 0.0
-        r.suspect = (r.steps >= min_steps
-                     and r.mean_displacement >= suspect_threshold)
+        r.suspect = r.steps >= min_steps and (
+            r.mean_displacement >= suspect_threshold
+            or r.override_rate >= DEFAULT_SUSPECT_OVERRIDE_RATE)
         reports.append(r)
     reports.sort(key=lambda r: (-r.mean_displacement, r.path))
     return reports

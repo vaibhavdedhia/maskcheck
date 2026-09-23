@@ -85,6 +85,28 @@ class TestAnalyze(unittest.TestCase):
         self.assertEqual(r.override_rate, 1.0)
         self.assertEqual(r.known_overrides, 1)
 
+    def test_override_rate_flags_despite_diluted_mean(self):
+        # Reproduces the live finding: half the samples conflict, so the
+        # pooled mean lands near 0.44 and slips under a 0.5 threshold while
+        # the field is catastrophically wrong half the time.
+        text = '{"a": "xxxx"}'
+        i = text.index("xxxx")
+        steps = [Step("x", i, lp(0.02), top_token="y"),
+                 Step("x", i + 1, lp(0.02), top_token="y"),
+                 Step("x", i + 2, lp(0.99), top_token="x"),
+                 Step("x", i + 3, lp(0.99), top_token="x")]
+        r = analyze(text, steps, suspect_threshold=0.5)[0]
+        self.assertLess(r.mean_displacement, 0.5)
+        self.assertEqual(r.override_rate, 0.5)
+        self.assertTrue(r.suspect)
+
+    def test_low_override_and_low_mean_is_not_suspect(self):
+        text = '{"a": "xx"}'
+        i = text.index("xx")
+        steps = [Step("x", i, lp(0.99), top_token="x"),
+                 Step("x", i + 1, lp(0.98), top_token="x")]
+        self.assertFalse(analyze(text, steps)[0].suspect)
+
     def test_empty_input(self):
         self.assertEqual(analyze(DOC, []), [])
         self.assertEqual(worst_displacement([]), 0.0)
@@ -107,3 +129,53 @@ class TestAnalyze(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestDocumentSelection(unittest.TestCase):
+    """Which of several JSON values in one generation is the answer.
+
+    Evidence from a live Qwen2.5-1.5B run: the model narrates first, may
+    embed a stray JSON array in that narration, and emits the real answer
+    last. So the last parseable value wins -- not the first.
+    """
+
+    def test_answer_after_narration_wins(self):
+        text = 'Line items: [{"sku": "NS-1"}] then the answer {"a": "v"}'
+        i_stray = text.index("NS-1")
+        i_real = text.index('"v"') + 1
+        reports = analyze(text, [Step("NS-1", i_stray, lp(0.9)),
+                                 Step("v", i_real, lp(0.2), top_token="X")])
+        self.assertEqual([r.path for r in reports], ["a"])
+
+    def test_content_before_the_close_is_still_counted(self):
+        text = '{"a": "v", "b": "w"}'
+        reports = analyze(text, [Step("v", text.index('"v"') + 1, lp(0.9)),
+                                 Step("w", text.index('"w"') + 1, lp(0.9))])
+        self.assertEqual(sorted(r.path for r in reports), ["a", "b"])
+
+
+class TestSpanAlignment(unittest.TestCase):
+    """Attribution must cover the span repair() actually parsed."""
+
+    def test_stray_array_in_prose_is_not_attributed(self):
+        # Verbatim shape of a real Qwen2.5-1.5B unconstrained generation.
+        text = ('Line items: [{"sku": "NS-1", "qty": 4}] ```json\n'
+                '{"invoice_id": "INV-7781", "currency": "CHF"}\n```')
+        stray = text.index("NS-1")
+        real = text.index("INV-7781")
+        reports = analyze(text, [Step("NS-1", stray, lp(0.9)),
+                                 Step("INV-7781", real, lp(0.2), top_token="X")])
+        self.assertEqual([r.path for r in reports], ["invoice_id"])
+
+    def test_explicit_span_overrides_detection(self):
+        text = '{"a": "v"} trailing {"b": "w"}'
+        second = text.index('"w"') + 1
+        reports = analyze(text, [Step("w", second, lp(0.5))],
+                          )
+        # locate() prefers the LAST parseable value, so 'b' is the document.
+        self.assertEqual([r.path for r in reports], ["b"])
+
+    def test_unparseable_text_still_reports(self):
+        # A generation that never produced JSON is still worth inspecting.
+        text = 'I cannot help with that'
+        self.assertEqual(analyze(text, [Step("cannot", 2, lp(0.5))]), [])

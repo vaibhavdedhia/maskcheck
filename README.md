@@ -39,6 +39,51 @@ invoice_id      3       0.05      0.07        0%
 3 field(s) analysed, 1 suspect. Worst mean displacement: 0.79
 ```
 
+## Measured: a schema that contradicts the data
+
+Qwen2.5-1.5B-Instruct (Q4_K_M) via llama.cpp 0.4.1, 8 invoice extractions.
+The schema restricts `currency` to `USD/EUR/GBP/INR`. Four of the eight
+documents are denominated in **CHF, JPY, CAD and AUD** — so the grammar
+*cannot* emit the right answer. The other four are controls.
+
+|                          | constrained | unconstrained |
+|--------------------------|-------------|---------------|
+| parse rate               | **1.000**   | 1.000         |
+| field accuracy vs gold   | **0.917**   | **1.000**     |
+| worst mean displacement  | 0.44 (`currency`) | 0.01    |
+| fields flagged           | `currency`  | none          |
+
+```
+FIELD              STEPS  MEAN DISP  MAX DISP  OVERRIDE
+-----------------  -----  ---------  --------  --------
+currency               9       0.44      1.00       44%  SUSPECT
+line_items[0].qty     10       0.01      0.08        0%
+vendor                30       0.01      0.17        0%
+total                 39       0.00      0.03        0%
+line_items[0].sku     25       0.00      0.02        0%
+invoice_id            42       0.00      0.00        0%
+```
+
+**Constrained decoding produced 100% schema-valid JSON that was less
+accurate than no constraint at all.** 44 of 48 gold leaves correct; the four
+errors are exactly the four forced currencies. Freed of the grammar, the
+model said `CHF` and scored 1.000.
+
+maskcheck flagged `currency` and nothing else — without labels.
+
+### What this does and does not show
+
+It shows the failure mode is real and that displacement localises it. It is
+**not** a claim about how often this happens in the wild: 8 cases, one model,
+documents generated from the records, and a conflict I constructed
+deliberately. A schema drifting from its data is a common bug, but its
+frequency is not measured here.
+
+An earlier corpus without conflicts produced displacement ≈ 0.00 and 1.000
+accuracy on both arms — a genuine null result, reported rather than tuned
+away. Displacement finds schemas fighting models; where none is fighting,
+it correctly says nothing.
+
 ## You do not need labelled data
 
 This is the part that matters. Most teams running structured output have no gold
@@ -100,24 +145,33 @@ object keys, so displacement there measures the mask working correctly. Includin
 them would drag every field toward the same meaningless number. Only value regions
 are scored.
 
+**Attribution follows the parsed span.** A model that narrates before
+answering can emit more than one complete JSON value — a live run produced
+`Line items: [{"sku": "NS-1", "qty": 4}]` inside its prose preamble before
+the real object. Displacement is confined to the span `repair()` parsed, so
+the two halves of the tool always score the same bytes. Where several values
+parse, the last one wins: models narrate first and answer second.
+
+**Pooled means dilute.** If only half your documents conflict with the
+schema, a field that is badly wrong half the time averages near 0.44 and
+slips under a 0.5 threshold. A field is therefore also flagged when the mask
+beat the model's own argmax on 25% or more of its tokens, which does not
+dilute the same way.
+
 **Teacher-forcing needs prefix logprobs.** Local engines expose these. Several hosted
 APIs have dropped echo logprobs, so remote coverage is partial and documented per
 provider rather than claimed universally.
 
 ## Status
 
-Core is complete and tested — 86 tests, zero dependencies, Python 3.9+.
+Core is complete and tested — 93 tests, zero dependencies, Python 3.9+.
 
 | component | state |
 |---|---|
 | Path attribution, displacement, scoring, repair, CLI | done |
 | `maskcheck demo` (fixture, no model) | done |
-| llama.cpp adapter | implemented; **not yet run against a live server** |
+| llama.cpp adapter | **verified against a live llama-server** |
 | MLX / transformers adapters | planned |
-
-The llama.cpp adapter is unit-tested against a stub transport, so its request
-shapes and error paths are covered, but no number in this README came from a
-real model yet. That is stated here rather than discovered by you.
 
 ### A note on how llama.cpp scoring works
 

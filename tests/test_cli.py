@@ -51,9 +51,12 @@ class TestCIGate(unittest.TestCase):
         _, out, _ = run_cli(["demo", "--fail-on-displacement", "0.5"])
         self.assertIn("FAIL", out)
 
-    def test_suspect_threshold_changes_flagging(self):
+    def test_high_override_survives_a_raised_threshold(self):
+        # Raising the displacement threshold must NOT silence a field the
+        # mask is overriding constantly -- that is the dilution case.
         _, out, _ = run_cli(["demo", "--suspect-threshold", "0.99"])
-        self.assertNotIn("SUSPECT", out)
+        self.assertIn("SUSPECT", out)
+        self.assertIn("override 75%", out)
 
 
 class TestJSONOutput(unittest.TestCase):
