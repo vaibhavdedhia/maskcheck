@@ -106,16 +106,36 @@ provider rather than claimed universally.
 
 ## Status
 
-Core is complete and tested — 71 tests, zero dependencies, Python 3.9+.
+Core is complete and tested — 86 tests, zero dependencies, Python 3.9+.
 
 | component | state |
 |---|---|
 | Path attribution, displacement, scoring, repair, CLI | done |
 | `maskcheck demo` (fixture, no model) | done |
-| llama.cpp adapter | in progress |
+| llama.cpp adapter | implemented; **not yet run against a live server** |
 | MLX / transformers adapters | planned |
 
-Engine adapters are optional extras; the core installs anywhere.
+The llama.cpp adapter is unit-tested against a stub transport, so its request
+shapes and error paths are covered, but no number in this README came from a
+real model yet. That is stated here rather than discovered by you.
+
+### A note on how llama.cpp scoring works
+
+`llama-server` has no echo-logprobs parameter — `n_probs` reports top-N only
+for *generated* tokens, and `n_predict: 0` fills the cache without returning
+prompt probabilities. So there is no single call that scores a supplied
+string.
+
+The adapter therefore walks the text one token at a time, requesting a single
+token at each prefix and reading the probability the unconstrained model gave
+to the token that actually followed. `cache_prompt` keeps the KV cache warm,
+so cost is ~one forward pass per token rather than a quadratic re-evaluation.
+
+When the emitted token falls outside the top-N window, its probability is
+unknown — but such a token is *by definition* heavily displaced, so the
+adapter records a **lower bound** and marks the argmax comparison unknown
+rather than inventing a number. Transformers-based engines can do this in one
+forward pass and will use that faster path.
 
 ## License
 

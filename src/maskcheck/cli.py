@@ -9,7 +9,8 @@ import sys
 from typing import List, Optional
 
 from . import __version__
-from .displacement import DEFAULT_SUSPECT_DISPLACEMENT, analyze, worst_displacement
+from .displacement import (DEFAULT_SUSPECT_DISPLACEMENT, analyze,
+                           analyze_many, worst_displacement)
 from .report import render_json, render_summary, render_table
 
 EXIT_OK = 0
@@ -79,13 +80,76 @@ def _cmd_demo(args) -> int:
     return _emit(reports, args, extra={"generated": text, "engine": engine.name})
 
 
+def _read_jsonl(path: str) -> List[object]:
+    out = []  # type: List[object]
+    with open(path) as fh:
+        for lineno, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except ValueError as exc:
+                raise ValueError("%s line %d: %s" % (path, lineno, exc))
+    return out
+
+
+def _as_prompt(entry: object) -> str:
+    """Accept either a bare JSON string or {"prompt": ...} per line."""
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict) and isinstance(entry.get("prompt"), str):
+        return entry["prompt"]
+    raise ValueError("each prompt line must be a string or have a 'prompt' key")
+
+
 def _cmd_run(args) -> int:
     if args.engine == "fake":
         return _cmd_demo(args)
-    sys.stderr.write(
-        "engine '%s' is not wired up yet in this build.\n"
-        "Run `maskcheck demo` to see the analysis on a fixture.\n" % args.engine)
-    return EXIT_ERROR
+
+    if not args.prompts:
+        sys.stderr.write("--prompts is required for --engine %s\n" % args.engine)
+        return EXIT_ERROR
+
+    from .engines.llamacpp import LlamaCppEngine
+    engine = LlamaCppEngine(base_url=args.model or "http://127.0.0.1:8080")
+
+    schema = None
+    if args.schema:
+        with open(args.schema) as fh:
+            schema = json.load(fh)
+
+    prompts = [_as_prompt(e) for e in _read_jsonl(args.prompts)]
+    labels = _read_jsonl(args.labels) if args.labels else None
+    if labels is not None and len(labels) != len(prompts):
+        sys.stderr.write("--labels has %d records but --prompts has %d\n"
+                         % (len(labels), len(prompts)))
+        return EXIT_ERROR
+
+    pairs = []
+    texts = []
+    for i, prompt in enumerate(prompts):
+        text = engine.generate(prompt, schema, args.max_tokens)
+        pairs.append((text, engine.score(prompt, text)))
+        texts.append(text)
+        sys.stderr.write("\rscored %d/%d" % (i + 1, len(prompts)))
+    sys.stderr.write("\n")
+
+    reports = analyze_many(pairs, suspect_threshold=args.suspect_threshold)
+
+    scores = None
+    if labels is not None:
+        from .repair import repair
+        from .scoring import aggregate, score_record
+        per = []
+        for text, gold in zip(texts, labels):
+            parsed, _stage = repair(text)
+            per.append(score_record(gold, parsed))
+        scores = aggregate(per)
+
+    return _emit(reports, args, scores=scores,
+                 extra={"engine": engine.name, "prompts": len(prompts),
+                        "schema": args.schema})
 
 
 def main(argv: Optional[List[str]] = None) -> int:

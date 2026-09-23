@@ -22,7 +22,7 @@ suspicion to measured accuracy via `scoring.py`.
 """
 
 import math
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .pathtrack import VALUE_REGIONS, path_at_offsets
 
@@ -94,6 +94,57 @@ class FieldReport(object):
         }
 
 
+def bucket(text, steps):
+    # type: (str, Sequence[Step], ) -> Dict[str, List[Step]]
+    """Group value-region steps by JSON path for one generation."""
+    if not steps:
+        return {}
+    starts = [s.offset for s in steps]
+    for i in range(1, len(starts)):
+        if starts[i] < starts[i - 1]:
+            raise ValueError("steps must be ordered by offset")
+    probes = [min(o + 1, len(text)) for o in starts]
+    out = {}  # type: Dict[str, List[Step]]
+    for step, (path, region) in zip(steps, path_at_offsets(text, probes)):
+        if region in VALUE_REGIONS and path:
+            out.setdefault(path, []).append(step)
+    return out
+
+
+def summarise(buckets,
+              suspect_threshold=DEFAULT_SUSPECT_DISPLACEMENT,
+              min_steps=DEFAULT_MIN_STEPS):
+    # type: (Dict[str, List[Step]], float, int) -> List[FieldReport]
+    """Turn pooled buckets into reports, worst-first."""
+    reports = []  # type: List[FieldReport]
+    for path, group in buckets.items():
+        r = FieldReport(path)
+        r.steps = len(group)
+        disps = [s.displacement for s in group]
+        r.mean_displacement = sum(disps) / len(disps)
+        r.max_displacement = max(disps)
+        known = [s for s in group if s.overridden is not None]
+        r.known_overrides = sum(1 for s in known if s.overridden)
+        r.override_rate = (r.known_overrides / len(known)) if known else 0.0
+        r.suspect = (r.steps >= min_steps
+                     and r.mean_displacement >= suspect_threshold)
+        reports.append(r)
+    reports.sort(key=lambda r: (-r.mean_displacement, r.path))
+    return reports
+
+
+def analyze_many(pairs,
+                 suspect_threshold=DEFAULT_SUSPECT_DISPLACEMENT,
+                 min_steps=DEFAULT_MIN_STEPS):
+    # type: (Sequence[Tuple[str, Sequence[Step]]], float, int) -> List[FieldReport]
+    """Pool many (text, steps) generations into one per-field report."""
+    pooled = {}  # type: Dict[str, List[Step]]
+    for text, steps in pairs:
+        for path, group in bucket(text, steps).items():
+            pooled.setdefault(path, []).extend(group)
+    return summarise(pooled, suspect_threshold, min_steps)
+
+
 def analyze(text,
             steps,
             suspect_threshold=DEFAULT_SUSPECT_DISPLACEMENT,
@@ -108,47 +159,7 @@ def analyze(text,
 
     Steps must be ordered by offset. Returns reports sorted worst-first.
     """
-    if not steps:
-        return []
-    starts = [s.offset for s in steps]
-    for i in range(1, len(starts)):
-        if starts[i] < starts[i - 1]:
-            raise ValueError("steps must be ordered by offset")
-
-    # Attribute at offset+1, i.e. having consumed the token's FIRST
-    # character. The region at offset i reflects only text[:i], so a numeric
-    # token would still read as `structural` -- the digit that opens the
-    # number region is the very character we are asking about. Using the
-    # first character also means a token straddling a boundary (`5}`) is
-    # credited to the region it begins in, which is the field it contributes
-    # a value to.
-    probes = [min(o + 1, len(text)) for o in starts]
-    attribution = path_at_offsets(text, probes)
-
-    buckets = {}  # type: Dict[str, List[Step]]
-    for step, (path, region) in zip(steps, attribution):
-        if region not in VALUE_REGIONS:
-            continue
-        if not path:
-            continue  # scalar at document root; nothing to name
-        buckets.setdefault(path, []).append(step)
-
-    reports = []  # type: List[FieldReport]
-    for path, group in buckets.items():
-        r = FieldReport(path)
-        r.steps = len(group)
-        disps = [s.displacement for s in group]
-        r.mean_displacement = sum(disps) / len(disps)
-        r.max_displacement = max(disps)
-        known = [s for s in group if s.overridden is not None]
-        r.known_overrides = sum(1 for s in known if s.overridden)
-        r.override_rate = (r.known_overrides / len(known)) if known else 0.0
-        r.suspect = (r.steps >= min_steps
-                     and r.mean_displacement >= suspect_threshold)
-        reports.append(r)
-
-    reports.sort(key=lambda r: (-r.mean_displacement, r.path))
-    return reports
+    return summarise(bucket(text, steps), suspect_threshold, min_steps)
 
 
 def worst_displacement(reports: Iterable[FieldReport]) -> float:

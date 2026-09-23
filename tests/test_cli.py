@@ -88,10 +88,45 @@ class TestUsage(unittest.TestCase):
         self.assertEqual(code, EXIT_ERROR)
         self.assertIn("usage", out.lower())
 
-    def test_unwired_engine_fails_clearly(self):
+    def test_run_requires_prompts(self):
         code, _, err = run_cli(["run", "--engine", "llamacpp"])
         self.assertEqual(code, EXIT_ERROR)
-        self.assertIn("not wired up", err)
+        self.assertIn("--prompts is required", err)
+
+    def test_fake_engine_via_run_matches_demo(self):
+        code, out, _ = run_cli(["run", "--engine", "fake"])
+        self.assertEqual(code, EXIT_OK)
+        self.assertIn("SUSPECT", out)
+
+    def test_label_count_mismatch_is_rejected(self):
+        # Silently zipping mismatched files would score the wrong pairs.
+        d = tempfile.mkdtemp()
+        prompts = os.path.join(d, "p.jsonl")
+        labels = os.path.join(d, "l.jsonl")
+        with open(prompts, "w") as fh:
+            fh.write('"one"\n"two"\n')
+        with open(labels, "w") as fh:
+            fh.write('{"a": 1}\n')
+        try:
+            code, _, err = run_cli(["run", "--engine", "llamacpp",
+                                    "--prompts", prompts, "--labels", labels])
+            self.assertEqual(code, EXIT_ERROR)
+            self.assertIn("1 records but", err)
+        finally:
+            os.unlink(prompts); os.unlink(labels); os.rmdir(d)
+
+    def test_malformed_jsonl_names_the_line(self):
+        d = tempfile.mkdtemp()
+        prompts = os.path.join(d, "p.jsonl")
+        with open(prompts, "w") as fh:
+            fh.write('"ok"\nnot json\n')
+        try:
+            code, _, err = run_cli(["run", "--engine", "llamacpp",
+                                    "--prompts", prompts])
+            self.assertEqual(code, EXIT_ERROR)
+            self.assertIn("line 2", err)
+        finally:
+            os.unlink(prompts); os.rmdir(d)
 
 
 class TestRender(unittest.TestCase):
