@@ -151,3 +151,20 @@ class TestRender(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestEngineErrors(unittest.TestCase):
+    def test_unreachable_server_gives_a_message_not_a_traceback(self):
+        d = tempfile.mkdtemp()
+        prompts = os.path.join(d, "p.jsonl")
+        with open(prompts, "w") as fh:
+            fh.write('"hello"\n')
+        try:
+            code, _, err = run_cli(["run", "--engine", "llamacpp",
+                                    "--model", "http://127.0.0.1:1",
+                                    "--prompts", prompts])
+            self.assertEqual(code, EXIT_ERROR)
+            self.assertIn("maskcheck:", err)
+            self.assertNotIn("Traceback", err)
+        finally:
+            os.unlink(prompts); os.rmdir(d)

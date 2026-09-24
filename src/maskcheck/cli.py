@@ -11,6 +11,7 @@ from typing import List, Optional
 from . import __version__
 from .displacement import (DEFAULT_SUSPECT_DISPLACEMENT, analyze,
                            analyze_many, worst_displacement)
+from .engines.base import EngineError
 from .report import render_json, render_summary, render_table
 
 EXIT_OK = 0
@@ -172,6 +173,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _cmd_demo(args)
         if args.command == "run":
             return _cmd_run(args)
+    except EngineError as exc:
+        # Most common first-run failure is simply no server listening.
+        # A stack trace here reads as a broken tool rather than a missing
+        # dependency, so it gets a plain message.
+        sys.stderr.write("maskcheck: %s\n" % exc)
+        return EXIT_ERROR
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         sys.stderr.write("maskcheck: %s\n" % exc)
         return EXIT_ERROR

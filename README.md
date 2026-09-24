@@ -6,9 +6,20 @@ Grammar-constrained generation — llama.cpp GBNF, XGrammar, Outlines, MLX's gui
 generation — guarantees your local model emits parseable, schema-conformant JSON.
 That guarantee is real, and it solved the problem everyone complains about.
 
-It also quietly moved the problem. Validity became free, so the ecosystem stopped
-measuring it — and stopped measuring anything else. Every engine reports schema
-conformance and tokens/sec. None report whether the *values* survived.
+It also quietly moved the problem: validity became free, and the constraint that
+buys it can push the model off the correct answer.
+
+**That trade-off is known and measured.** [The Constraint Tax (arXiv
+2605.26128)](https://arxiv.org/html/2605.26128) reports schema validity rising
+from 61.5% to 100% while answer accuracy falls from 19.7% to 11.0% on small
+models, and [2609.23742](https://arxiv.org/html/2609.23742) covers the
+scale-dependent version. This repository reproduces that result on extraction
+tasks; it does not claim to have discovered it.
+
+What those papers do not provide is a way to find *which field* is being
+damaged, in *your* schema, **without a labelled dataset** — the Constraint Tax
+paper states plainly that it proposes no detection method. That gap is what
+maskcheck addresses.
 
 ```
 {"invoice_id": "INV-2291", "vendor": "Acme Corp", "total": 48.00}
@@ -40,6 +51,10 @@ invoice_id      3       0.05      0.07        0%
 ```
 
 ## Measured: a schema that contradicts the data
+
+Replication, not discovery — see the citation above. What is added here is the
+extraction-task setting (the published work used synthetic reasoning families)
+and a per-field detector evaluated against its own pre-registered predictions.
 
 Qwen2.5-1.5B-Instruct (Q4_K_M) via llama.cpp 0.4.1, 8 invoice extractions.
 The schema restricts `currency` to `USD/EUR/GBP/INR`. Four of the eight
@@ -73,11 +88,14 @@ maskcheck flagged `currency` and nothing else — without labels.
 
 ### What this does and does not show
 
-It shows the failure mode is real and that displacement localises it. It is
-**not** a claim about how often this happens in the wild: 8 cases, one model,
-documents generated from the records, and a conflict I constructed
-deliberately. A schema drifting from its data is a common bug, but its
-frequency is not measured here.
+It shows the failure mode is real and that displacement localises it. The
+accuracy loss replicated across 4 models and 6 conflict types (see Scorecard).
+
+It is **not** a claim about how often this happens in the wild. The documents
+are generated from the records, and every conflict was constructed
+deliberately — half the records conflict, which no real corpus does. A schema
+drifting from its data is a common bug, but its *frequency* is not measured
+here, and that is the number that would tell you whether to install this.
 
 An earlier corpus without conflicts produced displacement ≈ 0.00 and 1.000
 accuracy on both arms — a genuine null result, reported rather than tuned
@@ -132,6 +150,30 @@ maskcheck run --engine llamacpp --model ./qwen2.5-1.5b.gguf \
 
 Exit `1` when any field exceeds the threshold. `--json -` emits machine-readable
 results on stdout for piping into `jq`.
+
+## Scorecard
+
+Across 4 models (Qwen2.5-1.5B/3B, Llama-3.2-1B, Gemma-2-2B) x 3 conflict types,
+constrained decoding cost accuracy in **12 of 12 cells**, mean −0.080, parse rate
+1.000 throughout. That is the replication.
+
+The detector itself is weaker, and the numbers are stated rather than implied:
+
+| | result |
+|---|---|
+| False positives | **0** in 24 constrained runs — no healthy field ever flagged |
+| Recall | **8 of 24** — it sleeps through most real conflicts |
+| Substitution conflicts (`enum`, nested `enum`) | detected |
+| Truncation conflicts (`maxLength`, `integer`) | mostly missed |
+| Forced fabrication (`required` on absent data) | never detected, **as predicted** |
+
+So a flag means investigate; **silence means nothing at all.** The precision is
+what makes it useful; the recall is why it is not a safety net.
+
+[`PREREGISTRATION.md`](PREREGISTRATION.md) was committed before the held-out set
+was run. Three of four predictions held; **P1 failed** — `minlen` was detected on
+2 of 4 models where I predicted it would be detected on most. The threshold that
+caused it is documented there and was deliberately not retuned after the fact.
 
 ## Honest limitations
 
