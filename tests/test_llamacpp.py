@@ -142,3 +142,23 @@ class TestScore(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestChatTemplate(unittest.TestCase):
+    def test_apply_template_returns_prompt(self):
+        class T(StubTransport):
+            def __call__(self, path, payload):
+                self.calls.append((path, payload))
+                assert path == "/apply-template"
+                return {"prompt": "<|user|>hi<|assistant|>"}
+        t = T()
+        self.assertEqual(LlamaCppEngine(transport=t).apply_template("hi"),
+                         "<|user|>hi<|assistant|>")
+        self.assertEqual(t.calls[0][1]["messages"][0]["content"], "hi")
+
+    def test_missing_prompt_field_raises(self):
+        class T(StubTransport):
+            def __call__(self, path, payload):
+                return {}
+        with self.assertRaises(EngineError):
+            LlamaCppEngine(transport=T()).apply_template("hi")

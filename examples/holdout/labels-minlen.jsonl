@@ -1,0 +1,8 @@
+{"invoice_id": "INV-5001", "line_items": [{"qty": 2, "sku": "A1"}], "vendor": "Bolt Depot"}
+{"invoice_id": "INV-5002", "line_items": [{"qty": 3, "sku": "GX-9"}], "vendor": "Cable Works"}
+{"invoice_id": "INV-5003", "line_items": [{"qty": 1, "sku": "TY4"}], "vendor": "Panel Pros"}
+{"invoice_id": "INV-5004", "line_items": [{"qty": 5, "sku": "B2"}], "vendor": "Screw Mart"}
+{"invoice_id": "INV-5005", "line_items": [{"qty": 2, "sku": "FM-LONGSKU-01"}], "vendor": "Fine Metals"}
+{"invoice_id": "INV-5006", "line_items": [{"qty": 4, "sku": "TY-EXTENDED-77"}], "vendor": "Timber Yard"}
+{"invoice_id": "INV-5007", "line_items": [{"qty": 1, "sku": "LS-VERYLONGCODE"}], "vendor": "Liquid Supply"}
+{"invoice_id": "INV-5008", "line_items": [{"qty": 6, "sku": "BG-1234567890"}], "vendor": "Bulk Grains"}

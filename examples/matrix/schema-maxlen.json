@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoice_id",
+    "vendor",
+    "currency",
+    "total",
+    "line_items"
+  ],
+  "properties": {
+    "invoice_id": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string",
+      "maxLength": 8
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP",
+        "INR"
+      ]
+    },
+    "total": {
+      "type": "number"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "qty"
+        ],
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

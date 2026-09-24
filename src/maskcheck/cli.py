@@ -36,6 +36,10 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--prompts", help="JSONL file of prompts")
     run.add_argument("--labels", help="JSONL of gold records; upgrades to measured accuracy")
     run.add_argument("--max-tokens", type=int, default=512)
+    run.add_argument("--chat", action="store_true",
+                     help="wrap each prompt in the model's chat template "
+                          "(needed for instruct models; without it they may "
+                          "not answer at all)")
     _add_common(run)
     return p
 
@@ -129,6 +133,11 @@ def _cmd_run(args) -> int:
     pairs = []
     texts = []
     for i, prompt in enumerate(prompts):
+        if getattr(args, "chat", False):
+            # Same templated prompt for generation AND scoring, or the
+            # teacher-forced logprobs would be conditioned on a different
+            # context than the one that produced the text.
+            prompt = engine.apply_template(prompt)
         text = engine.generate(prompt, schema, args.max_tokens)
         pairs.append((text, engine.score(prompt, text)))
         texts.append(text)

@@ -62,6 +62,24 @@ class LlamaCppEngine(Engine):
         self.n_probs = n_probs
         self._post = transport or _http_transport(base_url, timeout)
 
+    # ---- prompt templating -----------------------------------------
+    def apply_template(self, prompt: str) -> str:
+        """Wrap `prompt` in the model's own chat template.
+
+        Instruct-tuned models fed a raw prompt can fail badly -- Llama-3.2-1B
+        degenerates into repeating a line forever, which looks exactly like
+        "this model cannot produce JSON" and is really "this model was never
+        addressed properly". The template lives in the GGUF metadata, so
+        llama-server can apply the right one rather than the caller
+        hardcoding one per family.
+        """
+        resp = self._post("/apply-template",
+                          {"messages": [{"role": "user", "content": prompt}]})
+        out = resp.get("prompt")
+        if not isinstance(out, str):
+            raise EngineError("/apply-template returned no 'prompt'")
+        return out
+
     # ---- generation -------------------------------------------------
     def generate(self, prompt, schema=None, max_tokens=512):
         # type: (str, Optional[dict], int) -> str

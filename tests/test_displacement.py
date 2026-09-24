@@ -179,3 +179,40 @@ class TestSpanAlignment(unittest.TestCase):
         # A generation that never produced JSON is still worth inspecting.
         text = 'I cannot help with that'
         self.assertEqual(analyze(text, [Step("cannot", 2, lp(0.5))]), [])
+
+
+class TestClosingTokens(unittest.TestCase):
+    """A token that closes a value is a value decision, not punctuation."""
+
+    def test_closing_quote_is_attributed_to_its_field(self):
+        # How maxLength truncates: the grammar forces the quote early.
+        text = '{"vendor": "Mas"}'
+        q = text.index('"Mas"') + 4  # the CLOSING quote
+        r = analyze(text, [Step('"', q, lp(0.02), top_token="s")])[0]
+        self.assertEqual(r.path, "vendor")
+        self.assertGreater(r.mean_displacement, 0.9)
+        self.assertEqual(r.override_rate, 1.0)
+
+    def test_number_delimiter_is_attributed_to_its_field(self):
+        # How an integer constraint strips a decimal: '.' is blocked, so a
+        # delimiter is forced instead.
+        text = '{"qty": 2, "x": 1}'
+        comma = text.index(",")
+        r = analyze(text, [Step(",", comma, lp(0.03), top_token=".")])[0]
+        self.assertEqual(r.path, "qty")
+        self.assertGreater(r.mean_displacement, 0.9)
+
+    def test_separators_and_openers_stay_excluded(self):
+        text = '{"a": "v", "b": "w"}'
+        brace = 0
+        colon = text.index(":")
+        keyq = 1
+        # Steps must be in offset order: brace(0), key quote(1), colon(5).
+        self.assertEqual(analyze(text, [Step("{", brace, lp(0.01), top_token="["),
+                                        Step('"', keyq, lp(0.01), top_token="'"),
+                                        Step(":", colon, lp(0.01), top_token=",")]), [])
+
+    def test_closing_quote_of_a_key_is_not_a_value(self):
+        text = '{"abc": 1}'
+        key_close = text.index('"abc"') + 4
+        self.assertEqual(analyze(text, [Step('"', key_close, lp(0.01), top_token="d")]), [])

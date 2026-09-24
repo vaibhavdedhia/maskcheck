@@ -1,0 +1,8 @@
+{"currency": "USD", "invoice_id": "INV-3301", "line_items": [{"qty": 2.5, "sku": "BG-1"}], "total": 120.0, "vendor": "Bulk Grains Co"}
+{"currency": "USD", "invoice_id": "INV-3302", "line_items": [{"qty": 0.75, "sku": "FM-2"}], "total": 980.0, "vendor": "Fine Metals"}
+{"currency": "EUR", "invoice_id": "INV-3303", "line_items": [{"qty": 1.5, "sku": "LS-3"}], "total": 45.2, "vendor": "Liquid Supply"}
+{"currency": "GBP", "invoice_id": "INV-3304", "line_items": [{"qty": 3.25, "sku": "TY-4"}], "total": 610.0, "vendor": "Timber Yard"}
+{"currency": "USD", "invoice_id": "INV-3305", "line_items": [{"qty": 10, "sku": "BD-5"}], "total": 15.0, "vendor": "Bolt Depot"}
+{"currency": "EUR", "invoice_id": "INV-3306", "line_items": [{"qty": 4, "sku": "CW-6"}], "total": 230.0, "vendor": "Cable Works"}
+{"currency": "GBP", "invoice_id": "INV-3307", "line_items": [{"qty": 1, "sku": "PP-7"}], "total": 99.0, "vendor": "Panel Pros"}
+{"currency": "INR", "invoice_id": "INV-3308", "line_items": [{"qty": 7, "sku": "SM-8"}], "total": 1800.0, "vendor": "Screw Mart"}

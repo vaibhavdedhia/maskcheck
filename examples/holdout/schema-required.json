@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoice_id",
+    "vendor",
+    "approver"
+  ],
+  "properties": {
+    "invoice_id": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string"
+    },
+    "approver": {
+      "type": "string"
+    }
+  }
+}

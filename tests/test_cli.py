@@ -140,8 +140,10 @@ class TestRender(unittest.TestCase):
         r = FieldReport("a")
         r.steps = 1
         lines = render_table([r]).splitlines()
-        # Five titled columns get a rule; the blank flag column does not.
-        self.assertEqual(len(lines[1].split()), 5)
+        # Every titled column gets a rule; the blank flag column does not.
+        from maskcheck.report import _HEADERS
+        titled = len([h for h in _HEADERS if h])
+        self.assertEqual(len(lines[1].split()), titled)
 
     def test_json_without_threshold_omits_passed(self):
         self.assertNotIn("passed", json.loads(render_json([])))

@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoice_id",
+    "vendor",
+    "line_items"
+  ],
+  "properties": {
+    "invoice_id": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "qty"
+        ],
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 10
+          },
+          "qty": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

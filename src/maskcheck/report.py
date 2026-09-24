@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from .displacement import FieldReport, worst_displacement
 
-_HEADERS = ("FIELD", "STEPS", "MEAN DISP", "MAX DISP", "OVERRIDE", "")
+_HEADERS = ("FIELD", "STEPS", "FORCED", "HIT RATE", "MEAN DISP", "OVERRIDE", "")
 
 
 def _rows(reports: Sequence[FieldReport]) -> List[List[str]]:
@@ -14,8 +14,9 @@ def _rows(reports: Sequence[FieldReport]) -> List[List[str]]:
         rows.append([
             r.path,
             str(r.steps),
+            str(r.forced_tokens),
+            "%d%%" % round(r.hit_rate * 100),
             "%.2f" % r.mean_displacement,
-            "%.2f" % r.max_displacement,
             "%d%%" % round(r.override_rate * 100),
             "SUSPECT" if r.suspect else "",
         ])
@@ -52,8 +53,8 @@ def render_summary(reports, threshold=None, scores=None):
              % (len(reports), len(suspects), worst)]
     if suspects:
         lines.append("Suspect: " + ", ".join(
-            "%s (mean %.2f, override %d%%)"
-            % (r.path, r.mean_displacement, round(r.override_rate * 100))
+            "%s (%d/%d tokens forced, override %d%%)"
+            % (r.path, r.forced_tokens, r.steps, round(r.override_rate * 100))
             for r in suspects))
         lines.append("Displacement flags where the grammar fought the model; "
                      "it is not proof of a wrong value. Re-run with --labels "

@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoice_id",
+    "line_items"
+  ],
+  "properties": {
+    "invoice_id": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "unit",
+          "qty"
+        ],
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kg",
+              "lb"
+            ]
+          },
+          "qty": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

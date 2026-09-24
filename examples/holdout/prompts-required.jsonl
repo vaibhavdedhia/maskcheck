@@ -1,0 +1,8 @@
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7001\nFrom: Acme Corp\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7002\nFrom: Globex\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7003\nFrom: Initech\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7004\nFrom: Hooli\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7005\nFrom: Soylent Ltd\nApproved by: R. Chen\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7006\nFrom: Umbrella\nApproved by: K. Ito\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7007\nFrom: Cyberdyne\nApproved by: M. Diaz\n"}
+{"prompt": "Extract the invoice below as JSON matching this shape: {\"invoice_id\": string, \"vendor\": string, \"approver\": string}. Reply with JSON only.\n\nINVOICE INV-7008\nFrom: Wayne Ent\nApproved by: P. Okoro\n"}

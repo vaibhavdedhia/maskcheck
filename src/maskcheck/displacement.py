@@ -30,11 +30,24 @@ from .pathtrack import VALUE_REGIONS, PathTracker, path_at_offsets
 DEFAULT_SUSPECT_DISPLACEMENT = 0.5
 
 # A field is also suspect when the mask beat the model's own argmax this
-# often, regardless of mean displacement. Pooled means are DILUTED by clean
-# samples: if only half your documents conflict with the schema, a field
-# that is catastrophically wrong half the time shows a mean around 0.44 and
-# slips under a 0.5 threshold. Override rate does not dilute the same way.
+# often, regardless of mean displacement.
 DEFAULT_SUSPECT_OVERRIDE_RATE = 0.25
+
+# A token counts as FORCED when the unconstrained model gave it worse than
+# even odds -- i.e. the model would more likely than not have written
+# something else.
+FORCED_TOKEN_DISPLACEMENT = 0.5
+
+# A field is suspect when this fraction of its tokens were forced.
+#
+# Both numbers are chosen a priori, not fitted: 0.5 is "worse than even
+# odds" and 0.25 is "a quarter of this field's tokens". Mean displacement
+# was tried twice and failed twice, in opposite directions -- clean samples
+# diluted conflicting ones, then a happy closing token diluted an unhappy
+# value. A mean cannot express "rarely, but catastrophically", which is
+# exactly the shape of a schema that contradicts some of its data. A
+# fraction can, and unlike `max` it is not moved by one outlier token.
+DEFAULT_SUSPECT_HIT_RATE = 0.25
 # A field must contribute at least this many value tokens to be judged.
 DEFAULT_MIN_STEPS = 2
 
@@ -78,7 +91,8 @@ class Step(object):
 
 class FieldReport(object):
     __slots__ = ("path", "steps", "mean_displacement", "max_displacement",
-                 "override_rate", "known_overrides", "suspect")
+                 "override_rate", "known_overrides", "suspect",
+                 "forced_tokens", "hit_rate")
 
     def __init__(self, path):
         # type: (str) -> None
@@ -88,6 +102,8 @@ class FieldReport(object):
         self.max_displacement = 0.0
         self.override_rate = 0.0
         self.known_overrides = 0
+        self.forced_tokens = 0
+        self.hit_rate = 0.0
         self.suspect = False
 
     def as_dict(self) -> Dict[str, object]:
@@ -97,6 +113,8 @@ class FieldReport(object):
             "mean_displacement": round(self.mean_displacement, 6),
             "max_displacement": round(self.max_displacement, 6),
             "override_rate": round(self.override_rate, 6),
+            "forced_tokens": self.forced_tokens,
+            "hit_rate": round(self.hit_rate, 6),
             "suspect": self.suspect,
         }
 
@@ -142,14 +160,37 @@ def bucket(text, steps, span=None):
             continue
         if step.offset >= hi:
             break
-        probe = min(step.offset + 1, hi)
-        if probe > cursor:
-            tracker.feed(text[cursor:probe])
-            cursor = probe
-        region = tracker.region()
-        path = tracker.path()
-        if region in VALUE_REGIONS and path:
-            out.setdefault(path, []).append(step)
+
+        # State BEFORE the token's first character, and after it. The pair
+        # is what distinguishes a token that opens or separates from one
+        # that CLOSES a value.
+        before = min(step.offset, hi)
+        if before > cursor:
+            tracker.feed(text[cursor:before])
+            cursor = before
+        region_before, path_before = tracker.region(), tracker.path()
+
+        after = min(step.offset + 1, hi)
+        if after > cursor:
+            tracker.feed(text[cursor:after])
+            cursor = after
+        region_after, path_after = tracker.region(), tracker.path()
+
+        if region_after in VALUE_REGIONS and path_after:
+            # Ordinary value token: inside or beginning a value.
+            out.setdefault(path_after, []).append(step)
+        elif region_before in VALUE_REGIONS and path_before:
+            # This token CLOSED a value -- the quote ending a string, the
+            # delimiter ending a number. Closing early is a value decision,
+            # not punctuation: it is exactly how `maxLength` truncates a
+            # name and how `integer` strips a decimal. Excluding it (as a
+            # naive structural filter does) makes every truncation-forced
+            # error invisible, which measurement across four models showed
+            # costs accuracy just as much as a substitution does.
+            out.setdefault(path_before, []).append(step)
+        # Everything else -- `{`, `[`, `,`, `:`, keys and their quotes -- is
+        # pinned by the grammar by design. Its displacement measures the
+        # mask working correctly and would only add noise.
     return out
 
 
@@ -165,11 +206,13 @@ def summarise(buckets,
         disps = [s.displacement for s in group]
         r.mean_displacement = sum(disps) / len(disps)
         r.max_displacement = max(disps)
+        r.forced_tokens = sum(1 for d in disps if d >= FORCED_TOKEN_DISPLACEMENT)
+        r.hit_rate = r.forced_tokens / len(disps)
         known = [s for s in group if s.overridden is not None]
         r.known_overrides = sum(1 for s in known if s.overridden)
         r.override_rate = (r.known_overrides / len(known)) if known else 0.0
         r.suspect = r.steps >= min_steps and (
-            r.mean_displacement >= suspect_threshold
+            r.hit_rate >= DEFAULT_SUSPECT_HIT_RATE
             or r.override_rate >= DEFAULT_SUSPECT_OVERRIDE_RATE)
         reports.append(r)
     reports.sort(key=lambda r: (-r.mean_displacement, r.path))
